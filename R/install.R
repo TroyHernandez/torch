@@ -44,7 +44,7 @@ torch_version <- "2.5.1"
 #' reported length, an increase of the \code{timeout} value should help.
 #' 
 #' @export
-install_torch <- function(reinstall = FALSE, ..., .inform_restart = TRUE) {
+install_torch <- function(reinstall = FALSE, use_nightly = FALSE, ..., .inform_restart = TRUE) {
   have_installed <- !torch_is_installed() || reinstall
   
   liblantern <- lantern_url()
@@ -174,17 +174,41 @@ libtorch_url <- function() {
   if (url != "")
     return(url)
   
-  if (is_macos()) {
-    arch <- architecture()
-    url <- glue::glue("https://github.com/mlverse/libtorch-mac-m1/releases/download/LibTorch-for-R/libtorch-{arch}-v{torch_version}.zip") 
-  }
-  kind <- installation_kind()
-  if (is_windows()) {
-    url <- glue::glue("https://download.pytorch.org/libtorch/{kind}/libtorch-win-shared-with-deps-{torch_version}%2B{kind}.zip")
-  }
-  if (is_linux()) {
-    precxx11 <- ifelse(precxx11abi(), "", "cxx11-abi-")
-    url <- glue::glue("https://download.pytorch.org/libtorch/{kind}/libtorch-{precxx11}shared-with-deps-{torch_version}%2B{kind}.zip")
+  if (use_nightly) {
+    installer_message("Using nightly build of torch with CUDA 12.8.")
+    if (is_macos()) {
+      # arch <- architecture()
+      url <- "https://download.pytorch.org/libtorch/nightly/cpu/libtorch-macos-arm64-latest.zip"
+    }
+    kind <- installation_kind()
+    if (is_windows()) {
+      # Need to cover CPU version case
+      cuda_string <- gsub(pattern = ".", x = cuda_version(), replacement = "",
+                          fixed = TRUE)
+      url <- paste0("https://download.pytorch.org/libtorch/nightly/cu",
+                    cuda_string, "/libtorch-win-shared-with-deps-latest.zip")
+    }
+    if (is_linux()) {
+      # Need to cover CPU version case
+      precxx11 <- ifelse(precxx11abi(), "", "cxx11-abi-")
+      cuda_string <- gsub(pattern = ".", x = cuda_version(), replacement = "",
+                          fixed = TRUE)
+      url <- paste0("https://download.pytorch.org/libtorch/nightly/cu",
+                    cuda_string, "/libtorch-", precxx11, "shared-with-deps-latest.zip")
+    }
+  } else {
+    if (is_macos()) {
+      arch <- architecture()
+      url <- glue::glue("https://github.com/mlverse/libtorch-mac-m1/releases/download/LibTorch-for-R/libtorch-{arch}-v{torch_version}.zip") 
+    }
+    kind <- installation_kind()
+    if (is_windows()) {
+      url <- glue::glue("https://download.pytorch.org/libtorch/{kind}/libtorch-win-shared-with-deps-{torch_version}%2B{kind}.zip")
+    }
+    if (is_linux()) {
+      precxx11 <- ifelse(precxx11abi(), "", "cxx11-abi-")
+      url <- glue::glue("https://download.pytorch.org/libtorch/{kind}/libtorch-{precxx11}shared-with-deps-{torch_version}%2B{kind}.zip")
+    }
   }
   
   installer_message(c(
@@ -458,7 +482,7 @@ check_supported_cuda_version_windows <- function(version) {
 }
 
 check_supported_cuda_version_linux <- function(version) {
-  supported_versions <- c("11.8", "12.4")
+  supported_versions <- c("11.8", "12.4", "12.8")
   check_supported_version(version, supported_versions)
 }
 
@@ -664,3 +688,4 @@ is_package_version <- function(x) {
   regex <- "([[:digit:]]+[.-])*[[:digit:]]+"
   grepl(regex, x)
 }
+
